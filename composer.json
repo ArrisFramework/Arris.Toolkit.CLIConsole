@@ -1,0 +1,29 @@
+{
+    "name": "karelwintersky/arris.toolkit.cli-console",
+    "description": "Arris µFramework - CLIConsole class",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Karel Wintersky",
+            "email": "karel.wintersky@gmail.com"
+        }
+    ],
+    "keywords": [ "arris", "console" ],
+    "config": {
+        "optimize-autoloader": true
+    },
+    "require": {
+        "php": ">=7",
+        "ext-mbstring": "*",
+        "ext-readline": "*"
+    },
+    "suggest": {
+        "karelwintersky/arris": "Arris µFramework"
+    },
+    "autoload": {
+        "psr-4": {
+            "Arris\\Toolkit\\"           : ["interfaces", "sources"]
+        }
+    }
+}
