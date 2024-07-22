@@ -71,18 +71,31 @@ class CLIConsole implements CLIConsoleInterface
         }, $message);
 
         // replace <hr>
-        $pattern_hr = '#(?<hr>\<hr\s?\/?\>)#U';
+        /*$pattern_hr = '#(?<hr>\<hr\s?\/?\>)#U';
         $message = \preg_replace_callback($pattern_hr, function ($matches) {
             return
                 (self::$options['newline_before_hr'] ? PHP_EOL : '') .
                 \str_repeat('-', (int)self::$options['hr_length']) .
+                (self::$options['newline_after_hr'] ? PHP_EOL : '');
+        }, $message);*/
+
+        $pattern_hr = '#<\s*hr\s*(?:(?<attrName1>\w+)=[\\\"\'](?<attrValue1>\S*)[\\\"\'])?\s*(?:(?<attrName2>\w+)=[\\\"\'](?<attrValue2>\S*)[\\\"\'])>?#';
+        $message = \preg_replace_callback($pattern_hr, function ($matches) {
+            $color = $matches['attrName1'] == 'color' ? $matches['attrValue1'] : ($matches['attrName2'] == 'color' ? $matches['attrValue2'] : "white");
+            $width = $matches['attrName1'] == 'width' ? $matches['attrValue1'] : ($matches['attrName2'] == 'width' ? $matches['attrValue2'] : 80);
+            $width = \max((int)$width, 0);
+            $line = \str_repeat('-', $width);
+            $color = self::FOREGROUND_COLORS[$color] ?? self::FOREGROUND_COLORS['white'];
+            return
+                (self::$options['newline_before_hr'] ? PHP_EOL : '') .
+                "\033[{$color}m{$line}\033[0m" .
                 (self::$options['newline_after_hr'] ? PHP_EOL : '');
         }, $message);
 
         // replace <font>
         $pattern_font = '#(?<Full>\<font[\s]+color=[\\\'\"](?<Color>[\D]+)[\\\'\"]\>(?<Content>.*)\<\/font\>)#U';
         $message = \preg_replace_callback($pattern_font, function ($matches) use ($fg_colors) {
-            $color = isset($fg_colors[$matches['Color']]) ? $fg_colors[$matches['Color']] : $fg_colors['white'];
+            $color = $fg_colors[$matches['Color']] ?? $fg_colors['white'];
             return "\033[{$color}m{$matches['Content']}\033[0m";
         }, $message);
 
