@@ -21,7 +21,7 @@ class CLIConsole implements CLIConsoleInterface
     /**
      * @var array
      */
-    private static $options = [
+    private static array $options = [
         'strip_tags'        =>  false,
         'decode_entities'   =>  false,
         'hr_length'         =>  80,
@@ -29,8 +29,15 @@ class CLIConsole implements CLIConsoleInterface
         'newline_after_hr'  =>  true,
         'newline_before_hr' =>  true
     ];
+
+    public static function setOption($option, $value)
+    {
+        if (array_key_exists($option, self::$options)) {
+            self::$options[ $option ] = $value;
+        }
+    }
     
-    public static function setOptions($options = [])
+    public static function setOptions(array $options = [])
     {
         foreach ($options as $key => $value) {
             if (\array_key_exists($key, self::$options)) {
@@ -39,7 +46,7 @@ class CLIConsole implements CLIConsoleInterface
         }
     }
 
-    public static function readline($prompt, $allowed_pattern = '/.*/', $strict_mode = false)
+    public static function readline(string $prompt, string $allowed_pattern = '/.*/', bool $strict_mode = false)
     {
         if ($strict_mode) {
             if ((\substr($allowed_pattern, 0, 1) !== '/') || (\substr($allowed_pattern, -1, 1) !== '/')) {
@@ -60,7 +67,7 @@ class CLIConsole implements CLIConsoleInterface
         return $result;
     }
 
-    public static function echo_status_cli($message = "", $linebreak = true)
+    public static function format($message = "", bool $break_line = true)
     {
         $fg_colors = self::FOREGROUND_COLORS;
 
@@ -71,14 +78,6 @@ class CLIConsole implements CLIConsoleInterface
         }, $message);
 
         // replace <hr>
-        /*$pattern_hr = '#(?<hr>\<hr\s?\/?\>)#U';
-        $message = \preg_replace_callback($pattern_hr, function ($matches) {
-            return
-                (self::$options['newline_before_hr'] ? PHP_EOL : '') .
-                \str_repeat('-', (int)self::$options['hr_length']) .
-                (self::$options['newline_after_hr'] ? PHP_EOL : '');
-        }, $message);*/
-
         $pattern_hr = '#<\s*hr\s*(?:(?<attrName1>\w+)=[\\\"\'](?<attrValue1>\S*)[\\\"\'])?\s*(?:(?<attrName2>\w+)=[\\\"\'](?<attrValue2>\S*)[\\\"\'])>?#';
         $message = \preg_replace_callback($pattern_hr, function ($matches) {
             $color = $matches['attrName1'] == 'color' ? $matches['attrValue1'] : ($matches['attrName2'] == 'color' ? $matches['attrValue2'] : "white");
@@ -116,28 +115,31 @@ class CLIConsole implements CLIConsoleInterface
             $message = \htmlspecialchars_decode($message, ENT_QUOTES | ENT_HTML5);
         }
 
-        if ($linebreak === true) {
+        if ($break_line === true) {
             $message .= PHP_EOL;
         }
         
-        if (self::$options['no_say_mode'] === false) {
+        /*if (self::$options['no_say_mode'] === false) {
             echo $message;
-        }
+        }*/
         
         return $message;
     }
 
-    public static function say($message = "", $linebreak = true)
+
+    public static function get_message(string $message = "", bool $break_line = true)
     {
-        if (\php_sapi_name() === "cli") {
-            return self::echo_status_cli($message, $linebreak);
+        if (php_sapi_name() === "cli") {
+            $message = self::format($message, $break_line);
         } else {
-            if ($linebreak === true) {
-                $message .= PHP_EOL . "<br/>\r\n";
-            }
-            echo $message;
+            $message .= $break_line === true ? PHP_EOL . "<br/>\r\n" : '';
         }
         return $message;
+    }
+
+    public static function say($message = "", $break_line = true)
+    {
+        echo self::get_message($message, $break_line);
     }
     
 }

@@ -54,12 +54,30 @@ interface CLIConsoleInterface {
      * CLIConsole::readline('Введите число от 1 до 999: ', '/^\d{1,3}$/');
      * CLIConsole::readline('Введите число от 100 до 999: ', '/^\d{3}$/');
      *
+     * Никогда и нигде не используется...
+     *
      * @param $prompt -
-     * @param $allowed_pattern
-     * @param bool|FALSE $strict_mode
+     * @param string $allowed_pattern
+     * @param bool $strict_mode
      * @return bool|string
      */
-    public static function readline($prompt, $allowed_pattern = '/.*/', $strict_mode = FALSE);
+    public static function readline(string $prompt, string $allowed_pattern = '/.*/', bool $strict_mode = false);
+
+
+    /**
+     * Устанавливает один из флагов из списка ниже: <br>
+     * - 'strip_tags' - вырезать ли все лишние теги после обработки заменяемых? (false)<br>
+     *  - 'decode_entities' - преобразовывать ли html entities в их html-представление? (false)<br>
+     *  - 'hr_length' - HR tag length (80)<br>
+     *  - 'no_say_mode' - (false) если true - не печатать вывод на экран, а только вернуть<br>
+     *  - 'newline_before_hr' (true) добавлять ли перевод строки перед HR<br>
+     *  - 'newline_after_hr' (true) добавлять ли перевод строки после HR<br>
+     *
+     * @param $option
+     * @param $value
+     * @return mixed
+     */
+    public static function setOption($option, $value);
 
     /**
      * Устанавливает флаги обработки разных тегов в функции echo_status()
@@ -68,9 +86,10 @@ interface CLIConsoleInterface {
      *  - 'decode_entities' - преобразовывать ли html entities в их html-представление? (false)<br>
      *  - 'hr_length' - HR tag length (80)<br>
      *  - 'no_say_mode' - (false) если true - не печатать вывод на экран, а только вернуть<br>
-     *  - 'newline_after_hr' (true) добавлять ли перевод строки после HR<br>
+     * - 'newline_before_hr' (true) добавлять ли перевод строки перед HR<br>
+     * - 'newline_after_hr' (true) добавлять ли перевод строки после HR<br>
      */
-    public static function setOptions($options = []);
+    public static function setOptions(array $options = []);
 
     /**
      * Печатает в консоли цветное сообщение. Рекомендуемый к использованию метод.
@@ -82,16 +101,25 @@ interface CLIConsoleInterface {
      * <strong> - заменяет белым цветом
      *
      * @param string $message
-     * @param bool|TRUE $linebreak
+     * @param bool $break_line
      */
-    public static function say($message = "", $linebreak = TRUE);
+    public static function say(string $message = "", bool $break_line = true);
 
     /**
-     * Internal implementation of SAY for CLI
-     * Выводит сообщение на экран. Если мы вызваны из командной строки - заменяет теги на управляющие последовательности.
+     * Internal implementation. Форматирует сообщение и возвращает его.
      *
-     * @param $message
-     * @param bool|TRUE $breakline
+     * @param string $message
+     * @param bool $break_line
      */
-    public static function echo_status_cli($message = "", $breakline = TRUE);
+    public static function format(string $message = "", bool $break_line = true);
+
+    /**
+     * Генерирует сообщение - отформатированное ESCAPE-последовательностями для CLI
+     * и не отформатированное (с тегами) для WEB
+     *
+     * @param string $message
+     * @param bool $break_line
+     * @return array|string|string[]|null
+     */
+    public static function get_message(string $message = "", bool $break_line = true);
 }
