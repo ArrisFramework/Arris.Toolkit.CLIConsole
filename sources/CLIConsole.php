@@ -137,8 +137,16 @@ class CLIConsole implements CLIConsoleInterface
         return $message;
     }
 
-    public static function say($message = "", $break_line = true)
+    public static function say($message = '', $break_line = true)
     {
+        if (empty($message)) {
+            $message = '';
+        }
+
+        if (is_array($message) && !empty($message)) {
+            $message = sprintf(...$message);
+        }
+
         echo self::get_message($message, $break_line);
     }
     

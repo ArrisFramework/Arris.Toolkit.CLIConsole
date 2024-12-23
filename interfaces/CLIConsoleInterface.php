@@ -100,10 +100,12 @@ interface CLIConsoleInterface {
      * <hr> - горизонтальная черта, 80 минусов (работает только в отдельной строчке)
      * <strong> - заменяет белым цветом
      *
-     * @param string $message
-     * @param bool $break_line
+     * Отсутствие аргументов считается как пустая строка.
+     *
+     * @param string|array $message - строка или массив (в этом случае первый элемент - строка для sprintf)
+     * @param bool $break_line - переводить ли строку
      */
-    public static function say(string $message = "", bool $break_line = true);
+    public static function say($message, bool $break_line = true);
 
     /**
      * Internal implementation. Форматирует сообщение и возвращает его.
