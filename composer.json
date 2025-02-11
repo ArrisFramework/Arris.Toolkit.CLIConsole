@@ -1,6 +1,6 @@
 {
     "name": "karelwintersky/arris.toolkit.cli-console",
-    "description": "Arris µFramework - CLIConsole class",
+    "description": "Arris µFramework - CLIConsole helper",
     "type": "library",
     "license": "MIT",
     "authors": [
@@ -19,7 +19,8 @@
         "ext-readline": "*"
     },
     "suggest": {
-        "karelwintersky/arris": "Arris µFramework"
+        "karelwintersky/arris": "Arris µFramework",
+        "laravel/prompts": "Laravel Prompts"
     },
     "autoload": {
         "psr-4": {
