@@ -1,18 +1,19 @@
 <?php
 
-namespace Arris\Toolkit;
+namespace Arris\Toolkit\CLI;
 
+use Arris\Toolkit\CLI\Exceptions\MissingRequiredOptionException;
 use RuntimeException;
 
 /**
  * Парсер CLI-опций: регистрация + парсинг argv
  */
-final class CLIParser
+final class Parser
 {
-    /** @var array<string, CLIOption> */
+    /** @var array<string, Option> */
     private array $options = [];
 
-    public function add(CLIOption $option): self
+    public function add(Option $option): self
     {
         if (isset($this->options[$option->name])) {
             throw new RuntimeException("Option '{$option->name}' already registered");
@@ -23,7 +24,7 @@ final class CLIParser
 
     /**
      * @return array{values: array<string, mixed>, help: bool, verbose: bool}
-     * @throws CLIMissingRequiredOptionException
+     * @throws MissingRequiredOptionException
      */
     public function parse(array $argv): array
     {
@@ -68,7 +69,7 @@ final class CLIParser
                 }
 
                 if (!array_key_exists($option->name, $values)) {
-                    throw new CLIMissingRequiredOptionException($option->name, $option->short);
+                    throw new MissingRequiredOptionException($option->name, $option->short);
                 }
             }
         }
@@ -80,7 +81,7 @@ final class CLIParser
         ];
     }
 
-    /** @return array<string, CLIOption> */
+    /** @return array<string, Option> */
     public function getOptions(): array
     {
         return $this->options;

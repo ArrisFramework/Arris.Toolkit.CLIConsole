@@ -4,6 +4,31 @@ namespace Arris\Toolkit;
 
 class CLIPrompt implements CLIPromptInterface
 {
+    public static function readline(
+        string $prompt,
+        string $allowed_pattern = '/.*/',
+        bool $strict_mode = false
+    ): bool|string
+    {
+        if ($strict_mode) {
+            if ((!str_starts_with($allowed_pattern, '/')) || (!str_ends_with($allowed_pattern, '/'))) {
+                return false;
+            }
+        } else {
+            if (!str_starts_with($allowed_pattern, '/'))
+                $allowed_pattern = '/' . $allowed_pattern;
+            if (!str_ends_with($allowed_pattern, '/'))
+                $allowed_pattern .= '/';
+        }
+
+        do {
+            $result = \readline($prompt);
+
+        } while (\preg_match($allowed_pattern, $result) !== 1);
+
+        return $result;
+    }
+
     public static function prompt(): string
     {
         $stdin = fopen('php://stdin', 'r');

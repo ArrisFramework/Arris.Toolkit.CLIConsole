@@ -2,6 +2,10 @@
 
 namespace Arris\Toolkit;
 
+use Arris\Toolkit\CLI\Exceptions\MissingRequiredOptionException;
+use Arris\Toolkit\CLI\Option;
+use Arris\Toolkit\CLI\OptionType;
+use Arris\Toolkit\CLI\Parser;
 use Closure;
 
 /**
@@ -9,7 +13,7 @@ use Closure;
  */
 final class CLIRunner
 {
-    private CLIParser $parser;
+    private Parser $parser;
     /** @var array<string, mixed> */
     private array $optionsValues = [];
     /** @var array<string, mixed> */
@@ -19,21 +23,21 @@ final class CLIRunner
 
     public function __construct(?string $scriptDescription = null)
     {
-        $this->parser = new CLIParser();
+        $this->parser = new Parser();
         $this->scriptDescription = $scriptDescription;
     }
 
     public function register(
-        string $option,
-        ?string $short = null,
-        string $description = '',
-        CLIOptionType $type = CLIOptionType::Flag,
-        mixed $default = null,
-        ?bool $required = null,
+        string             $option,
+        ?string            $short = null,
+        string             $description = '',
+        OptionType         $type = OptionType::Flag,
+        mixed              $default = null,
+        ?bool              $required = null,
         Closure|array|null $handler = null,
     ): self {
         $this->parser->add(
-            new CLIOption($option, $short, $description, $type, $default, $required, $handler)
+            new Option($option, $short, $description, $type, $default, $required, $handler)
         );
         return $this;
     }
@@ -76,7 +80,7 @@ final class CLIRunner
 
         try {
             $result = $this->parser->parse($argv ?? []);
-        } catch (CLIMissingRequiredOptionException $e) {
+        } catch (MissingRequiredOptionException $e) {
             $this->say("<font color='red'>Error: {$e->getMessage()}</font>", true);
             $this->say("<font color='yellow'>Use --help for available options</font>", true);
             exit(2);
@@ -137,9 +141,9 @@ final class CLIRunner
         foreach ($this->parser->getOptions() as $option) {
             $shortPart = $option->short ? "-{$option->short}, " : '    ';
             $valueSuffix = match ($option->type) {
-                CLIOptionType::Flag => '',
-                CLIOptionType::WithValue => '=<value>',
-                CLIOptionType::WithOptionalValue => '[=<value>]',
+                OptionType::Flag => '',
+                OptionType::WithValue => '=<value>',
+                OptionType::WithOptionalValue => '[=<value>]',
             };
             $requiredMark = $option->required
                 ? " <font color='red'>[required]</font>"

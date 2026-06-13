@@ -50,18 +50,6 @@ interface CLIConsoleInterface {
         'light gray'=> '47'
     ];
 
-    /**
-     * CLIConsole::readline('Введите число от 1 до 999: ', '/^\d{1,3}$/');
-     * CLIConsole::readline('Введите число от 100 до 999: ', '/^\d{3}$/');
-     *
-     * Никогда и нигде не используется...
-     *
-     * @param $prompt -
-     * @param string $allowed_pattern
-     * @param bool $strict_mode
-     * @return bool|string
-     */
-    public static function readline(string $prompt, string $allowed_pattern = '/.*/', bool $strict_mode = false);
 
 
     /**
@@ -75,13 +63,13 @@ interface CLIConsoleInterface {
      *
      * @param $option
      * @param $value
-     * @return mixed
+     * @return void
      */
-    public static function setOption($option, $value);
+    public static function setOption($option, $value): void;
 
     /**
      * Устанавливает флаги обработки разных тегов в функции echo_status()
-     * @param array $options <br>
+     * @param array<string, mixed> $options <br>
      *  - 'strip_tags' - вырезать ли все лишние теги после обработки заменяемых? (false)<br>
      *  - 'decode_entities' - преобразовывать ли html entities в их html-представление? (false)<br>
      *  - 'hr_length' - HR tag length (80)<br>
@@ -102,10 +90,10 @@ interface CLIConsoleInterface {
      *
      * Отсутствие аргументов считается как пустая строка.
      *
-     * @param string|array $message - строка или массив (в этом случае первый элемент - строка для sprintf)
-     * @param bool $break_line - переводить ли строку
+     * @param array|string $message - строка или массив (в этом случае первый элемент - строка для sprintf)
+     * @param bool $break_line      - переводить ли строку
      */
-    public static function say($message, bool $break_line = true);
+    public static function say(array|string $message, bool $break_line = true);
 
     /**
      * Internal implementation. Форматирует сообщение и возвращает его.

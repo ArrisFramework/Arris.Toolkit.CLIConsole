@@ -1,8 +1,8 @@
 <?php
 
-namespace Arris\Toolkit;
+namespace Arris\Toolkit\CLI;
 
-enum CLIOptionType: string
+enum OptionType: string
 {
     case Flag = 'flag';
     case WithValue = 'with_value';

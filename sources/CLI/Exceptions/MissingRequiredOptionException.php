@@ -1,10 +1,10 @@
 <?php
 
-namespace Arris\Toolkit;
+namespace Arris\Toolkit\CLI\Exceptions;
 
 use RuntimeException;
 
-final class CLIMissingRequiredOptionException extends RuntimeException
+final class MissingRequiredOptionException extends RuntimeException
 {
     public function __construct(
         public readonly string $optionName,

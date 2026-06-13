@@ -9,6 +9,7 @@
  *
  * Date: 04.03.2018, time: 19:27
  * Date: 18.07.2024, time: 15:30 - PHP8 compatible
+ * Date: 14.06.2026, time: 01:30 - PHP8.2 required
  */
 
 namespace Arris\Toolkit;
@@ -18,6 +19,11 @@ namespace Arris\Toolkit;
  */
 class CLIConsole implements CLIConsoleInterface
 {
+    private const PATTERN_BR = '#(?<br>\<br\s?\/?\>)#U';
+    private const PATTERN_HR = '#<\s*hr\s*(?:(?<attrName1>\w+)=[\\\"\'](?<attrValue1>\S*)[\\\"\'])?\s*(?:(?<attrName2>\w+)=[\\\"\'](?<attrValue2>\S*)[\\\"\'])>?#';
+    private const PATTERN_FONT = '#(?<Full>\<font[\s]+color=[\\\'\"](?<Color>[\D]+)[\\\'\"]\>(?<Content>.*)\<\/font\>)#U';
+    private const PATTERN_STRONG = '#(?<Full>\<strong\>(?<Content>.*)\<\/strong\>)#U';
+
     /**
      * @var array
      */
@@ -30,7 +36,7 @@ class CLIConsole implements CLIConsoleInterface
         'newline_before_hr' =>  true
     ];
 
-    public static function setOption($option, $value): void
+    public static function setOption($option, $value):void
     {
         if (array_key_exists($option, self::$options)) {
             self::$options[ $option ] = $value;
@@ -46,39 +52,17 @@ class CLIConsole implements CLIConsoleInterface
         }
     }
 
-    public static function readline(string $prompt, string $allowed_pattern = '/.*/', bool $strict_mode = false): bool|string
-    {
-        if ($strict_mode) {
-            if ((!str_starts_with($allowed_pattern, '/')) || (!str_ends_with($allowed_pattern, '/'))) {
-                return false;
-            }
-        } else {
-            if (!str_starts_with($allowed_pattern, '/'))
-                $allowed_pattern = '/' . $allowed_pattern;
-            if (!str_ends_with($allowed_pattern, '/'))
-                $allowed_pattern .= '/';
-        }
-
-        do {
-            $result = \readline($prompt);
-
-        } while (\preg_match($allowed_pattern, $result) !== 1);
-
-        return $result;
-    }
-
     public static function format($message = "", bool $break_line = true): array|string|null
     {
         $fg_colors = self::FOREGROUND_COLORS;
 
         // replace <br>
-        $pattern_br = '#(?<br>\<br\s?\/?\>)#U';
-        $message = \preg_replace_callback($pattern_br, function ($matches) {
+        $message = \preg_replace_callback(self::PATTERN_BR, function ($matches) {
             return PHP_EOL;
         }, $message);
 
         // replace <hr>
-        $pattern_hr = '#<\s*hr\s*(?:(?<attrName1>\w+)=[\\\"\'](?<attrValue1>\S*)[\\\"\'])?\s*(?:(?<attrName2>\w+)=[\\\"\'](?<attrValue2>\S*)[\\\"\'])>?#';
+        $pattern_hr = self::PATTERN_HR;
         $message = \preg_replace_callback($pattern_hr, function ($matches) {
             $color = $matches['attrName1'] == 'color' ? $matches['attrValue1'] : ($matches['attrName2'] == 'color' ? $matches['attrValue2'] : "white");
             $width = $matches['attrName1'] == 'width' ? $matches['attrValue1'] : ($matches['attrName2'] == 'width' ? $matches['attrValue2'] : 80);
@@ -92,14 +76,14 @@ class CLIConsole implements CLIConsoleInterface
         }, $message);
 
         // replace <font>
-        $pattern_font = '#(?<Full>\<font[\s]+color=[\\\'\"](?<Color>[\D]+)[\\\'\"]\>(?<Content>.*)\<\/font\>)#U';
+        $pattern_font = self::PATTERN_FONT;
         $message = \preg_replace_callback($pattern_font, function ($matches) use ($fg_colors) {
             $color = $fg_colors[$matches['Color']] ?? $fg_colors['white'];
             return "\033[{$color}m{$matches['Content']}\033[0m";
         }, $message);
 
         // replace <strong>
-        $pattern_strong = '#(?<Full>\<strong\>(?<Content>.*)\<\/strong\>)#U';
+        $pattern_strong = self::PATTERN_STRONG;
         $message = \preg_replace_callback($pattern_strong, function ($matches) use ($fg_colors) {
             $color = $fg_colors['white'];
             return "\033[{$color}m{$matches['Content']}\033[0m";
@@ -133,7 +117,7 @@ class CLIConsole implements CLIConsoleInterface
         return $message;
     }
 
-    public static function say($message = '', $break_line = true): void
+    public static function say(array|string $message = '', $break_line = true): void
     {
         if (empty($message)) {
             $message = '';

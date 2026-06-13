@@ -22,5 +22,19 @@ interface CLIPromptInterface
      */
     public static function hiddenPrompt(bool $allowFallback = false): string;
 
+    /**
+     * CLIConsole::readline('Введите число от 1 до 999: ', '/^\d{1,3}$/');
+     * CLIConsole::readline('Введите число от 100 до 999: ', '/^\d{3}$/');
+     *
+     * Никогда и нигде не используется...
+     *
+     * @param $prompt -
+     * @param string $allowed_pattern
+     * @param bool $strict_mode
+     * @return bool|string
+     */
+    public static function readline(string $prompt, string $allowed_pattern = '/.*/', bool $strict_mode = false);
+
+
 
 }
