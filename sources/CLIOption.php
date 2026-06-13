@@ -6,31 +6,35 @@ use Closure;
 
 final readonly class CLIOption
 {
+    public readonly bool $required;
+
     public function __construct(
         public string $name,
         public ?string $short,
         public string $description,
         public CLIOptionType $type,
         public mixed $default,
-        public Closure|array|null $handler,
-    ) {}
+        ?bool $required = null,
+        public Closure|array|null $handler = null,
+    ) {
+        // Автоматически делаем required, если тип WithValue и нет default
+        $this->required = $required ?? ($this->type === CLIOptionType::WithValue && $this->default === null);
+    }
 
     public function isFlag(): bool
     {
         return $this->type === CLIOptionType::Flag;
     }
 
-    /** Паттерн для длинной опции в getopt (name | name: | name::) */
     public function getLongPattern(): string
     {
         return $this->name . match ($this->type) {
                 CLIOptionType::Flag => '',
-                CLIOptionType::RequiredValue => ':',
-                CLIOptionType::OptionalValue => '::',
+                CLIOptionType::WithValue => ':',
+                CLIOptionType::WithOptionalValue => '::',
             };
     }
 
-    /** Паттерн для короткой опции в getopt (r | r: | r::) */
     public function getShortPattern(): string
     {
         if ($this->short === null) {
@@ -38,8 +42,8 @@ final readonly class CLIOption
         }
         return $this->short . match ($this->type) {
                 CLIOptionType::Flag => '',
-                CLIOptionType::RequiredValue => ':',
-                CLIOptionType::OptionalValue => '::',
+                CLIOptionType::WithValue => ':',
+                CLIOptionType::WithOptionalValue => '::',
             };
     }
 }

@@ -30,14 +30,14 @@ class CLIConsole implements CLIConsoleInterface
         'newline_before_hr' =>  true
     ];
 
-    public static function setOption($option, $value)
+    public static function setOption($option, $value): void
     {
         if (array_key_exists($option, self::$options)) {
             self::$options[ $option ] = $value;
         }
     }
     
-    public static function setOptions(array $options = [])
+    public static function setOptions(array $options = []): void
     {
         foreach ($options as $key => $value) {
             if (\array_key_exists($key, self::$options)) {
@@ -46,16 +46,16 @@ class CLIConsole implements CLIConsoleInterface
         }
     }
 
-    public static function readline(string $prompt, string $allowed_pattern = '/.*/', bool $strict_mode = false)
+    public static function readline(string $prompt, string $allowed_pattern = '/.*/', bool $strict_mode = false): bool|string
     {
         if ($strict_mode) {
-            if ((\substr($allowed_pattern, 0, 1) !== '/') || (\substr($allowed_pattern, -1, 1) !== '/')) {
+            if ((!str_starts_with($allowed_pattern, '/')) || (!str_ends_with($allowed_pattern, '/'))) {
                 return false;
             }
         } else {
-            if (\substr($allowed_pattern, 0, 1) !== '/')
+            if (!str_starts_with($allowed_pattern, '/'))
                 $allowed_pattern = '/' . $allowed_pattern;
-            if (\substr($allowed_pattern, -1, 1) !== '/')
+            if (!str_ends_with($allowed_pattern, '/'))
                 $allowed_pattern .= '/';
         }
 
@@ -67,7 +67,7 @@ class CLIConsole implements CLIConsoleInterface
         return $result;
     }
 
-    public static function format($message = "", bool $break_line = true)
+    public static function format($message = "", bool $break_line = true): array|string|null
     {
         $fg_colors = self::FOREGROUND_COLORS;
 
@@ -118,16 +118,12 @@ class CLIConsole implements CLIConsoleInterface
         if ($break_line === true) {
             $message .= PHP_EOL;
         }
-        
-        /*if (self::$options['no_say_mode'] === false) {
-            echo $message;
-        }*/
-        
+
         return $message;
     }
 
 
-    public static function get_message(string $message = "", bool $break_line = true)
+    public static function get_message(string $message = "", bool $break_line = true): array|string|null
     {
         if (php_sapi_name() === "cli") {
             $message = self::format($message, $break_line);
@@ -137,7 +133,7 @@ class CLIConsole implements CLIConsoleInterface
         return $message;
     }
 
-    public static function say($message = '', $break_line = true)
+    public static function say($message = '', $break_line = true): void
     {
         if (empty($message)) {
             $message = '';
@@ -152,4 +148,4 @@ class CLIConsole implements CLIConsoleInterface
     
 }
 
-# -eof-
+# -eof- #

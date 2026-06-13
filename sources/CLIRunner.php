@@ -10,72 +10,87 @@ use Closure;
 final class CLIRunner
 {
     private CLIParser $parser;
-    /** @var array<string, mixed> Значения опций после парсинга */
+    /** @var array<string, mixed> */
     private array $optionsValues = [];
-    /** @var array<string, mixed> Произвольные переменные приложения */
+    /** @var array<string, mixed> */
     private array $variables = [];
+    private ?string $scriptDescription;
+    private bool $verbose = false;
 
-    private ?string $initialMessage = null;
-
-    public function __construct(?string $initialMessage = null)
+    public function __construct(?string $scriptDescription = null)
     {
-        $this->initialMessage = $initialMessage;
         $this->parser = new CLIParser();
+        $this->scriptDescription = $scriptDescription;
     }
 
-    /**
-     * Регистрация опции
-     */
     public function register(
         string $option,
         ?string $short = null,
         string $description = '',
         CLIOptionType $type = CLIOptionType::Flag,
         mixed $default = null,
+        ?bool $required = null,
         Closure|array|null $handler = null,
     ): self {
         $this->parser->add(
-            new CLIOption($option, $short, $description, $type, $default, $handler)
+            new CLIOption($option, $short, $description, $type, $default, $required, $handler)
         );
         return $this;
     }
 
-    /** Была ли передана опция */
     public function has(string $option): bool
     {
         return array_key_exists($option, $this->optionsValues);
     }
 
-    /** Значение опции */
     public function get(string $option): mixed
     {
         return $this->optionsValues[$option] ?? null;
     }
 
-    /** Установка произвольной переменной приложения */
     public function set(string $key, mixed $value): void
     {
         $this->variables[$key] = $value;
     }
 
-    /** Получение произвольной переменной приложения */
     public function getVar(string $key): mixed
     {
         return $this->variables[$key] ?? null;
     }
 
-    /**
-     * Запуск обработки CLI.
-     * Возвращает true если были обработаны опции, false если был показан help.
-     */
+    public function isVerbose(): bool
+    {
+        return $this->verbose;
+    }
+
+    public function say(string $message, bool $always = false): void
+    {
+        if ($always || $this->verbose) {
+            CLIConsole::say($message);
+        }
+    }
+
     public function run(): bool
     {
         global $argv;
 
-        $result = $this->parser->parse($argv ?? []);
-        $this->optionsValues = $result['values'];
+        try {
+            $result = $this->parser->parse($argv ?? []);
+        } catch (CLIMissingRequiredOptionException $e) {
+            $this->say("<font color='red'>Error: {$e->getMessage()}</font>", true);
+            $this->say("<font color='yellow'>Use --help for available options</font>", true);
+            exit(2);
+        }
 
-        if ($result['help'] || empty($this->optionsValues)) {
+        $this->optionsValues = $result['values'];
+        $this->verbose = $result['verbose'];
+
+        if ($result['help']) {
+            $this->showHelp();
+            return false;
+        }
+
+        if (empty($this->optionsValues) && !$this->verbose) {
             $this->showHelp();
             return false;
         }
@@ -94,29 +109,68 @@ final class CLIRunner
         }
     }
 
-    public function showHelp(): void
+    private function showHelp(): void
     {
-        if ($this->initialMessage) CLIConsole::say("<br>" . $this->initialMessage);
+        if ($this->scriptDescription !== null) {
+            $this->say($this->scriptDescription, true);
+            $this->say('', true);
+        }
 
-        CLIConsole::say("<br><font color='green'>Available options:</font>");
-        CLIConsole::say("  <font color='yellow'>-h, --help</font>             Show this help");
+        $this->say("<font color='green'>Available options:</font>", true);
 
+        $builtinOptions = [
+            [
+                'label' => '-h, --help',
+                'label_with_tags' => "<font color='yellow'>-h, --help</font>",
+                'description' => 'Show this help',
+                'suffix' => '',
+            ],
+            [
+                'label' => '-v, --verbose',
+                'label_with_tags' => "<font color='yellow'>-v, --verbose</font>",
+                'description' => 'Enable verbose output',
+                'suffix' => '',
+            ],
+        ];
+
+        $userOptions = [];
         foreach ($this->parser->getOptions() as $option) {
             $shortPart = $option->short ? "-{$option->short}, " : '    ';
             $valueSuffix = match ($option->type) {
                 CLIOptionType::Flag => '',
-                CLIOptionType::RequiredValue => '=<value>',
-                CLIOptionType::OptionalValue => '[=<value>]',
+                CLIOptionType::WithValue => '=<value>',
+                CLIOptionType::WithOptionalValue => '[=<value>]',
             };
+            $requiredMark = $option->required
+                ? " <font color='red'>[required]</font>"
+                : '';
 
-            CLIConsole::say(sprintf(
-                "  <font color='yellow'>%s--%s%s</font>  %s",
-                $shortPart,
-                $option->name,
-                $valueSuffix,
-                $option->description,
-            ));
+            $label = "{$shortPart}--{$option->name}{$valueSuffix}";
+            $userOptions[] = [
+                'label' => $label,
+                'label_with_tags' => "<font color='yellow'>{$label}</font>",
+                'description' => $option->description,
+                'suffix' => $requiredMark,
+            ];
         }
-        CLIConsole::say();
+
+        $allOptions = array_merge($builtinOptions, $userOptions);
+
+        $maxLength = 0;
+        foreach ($allOptions as $opt) {
+            $maxLength = max($maxLength, strlen($opt['label']));
+        }
+
+        $padding = $maxLength + 4;
+
+        foreach ($allOptions as $opt) {
+            $paddingNeeded = $padding - strlen($opt['label']);
+            $paddingSpaces = str_repeat(' ', $paddingNeeded);
+
+            $this->say(
+                "  {$opt['label_with_tags']}{$paddingSpaces}{$opt['description']}{$opt['suffix']}",
+                true
+            );
+        }
     }
 }

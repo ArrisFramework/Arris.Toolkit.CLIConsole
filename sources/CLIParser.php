@@ -22,17 +22,21 @@ final class CLIParser
     }
 
     /**
-     * Парсит argv и возвращает распарсенные значения + признак запроса help
-     *
-     * @param array<int, string> $argv
-     * @return array{values: array<string, mixed>, help: bool}
+     * @return array{values: array<string, mixed>, help: bool, verbose: bool}
+     * @throws CLIMissingRequiredOptionException
      */
     public function parse(array $argv): array
     {
-        $short = 'h';
-        $long = ['help'];
+        $short = 'hv';
+        $long = ['help', 'verbose'];
 
         foreach ($this->options as $option) {
+            if ($option->name === 'verbose' || $option->short === 'v') {
+                throw new RuntimeException(
+                    "Option name 'verbose' or short 'v' is reserved for built-in verbose mode"
+                );
+            }
+
             $short .= $option->getShortPattern();
             $long[] = $option->getLongPattern();
         }
@@ -43,9 +47,11 @@ final class CLIParser
             throw new RuntimeException('Failed to parse CLI options');
         }
 
+        $help = array_key_exists('h', $parsed) || array_key_exists('help', $parsed);
+        $verbose = array_key_exists('v', $parsed) || array_key_exists('verbose', $parsed);
+
         $values = [];
         foreach ($this->options as $name => $option) {
-            // Приоритет: длинная опция > короткая > default
             if (array_key_exists($name, $parsed)) {
                 $values[$name] = $option->isFlag() ? true : $parsed[$name];
             } elseif ($option->short !== null && array_key_exists($option->short, $parsed)) {
@@ -55,9 +61,22 @@ final class CLIParser
             }
         }
 
+        if (!$help) {
+            foreach ($this->options as $option) {
+                if (!$option->required) {
+                    continue;
+                }
+
+                if (!array_key_exists($option->name, $values)) {
+                    throw new CLIMissingRequiredOptionException($option->name, $option->short);
+                }
+            }
+        }
+
         return [
             'values' => $values,
-            'help' => array_key_exists('h', $parsed) || array_key_exists('help', $parsed),
+            'help' => $help,
+            'verbose' => $verbose,
         ];
     }
 
