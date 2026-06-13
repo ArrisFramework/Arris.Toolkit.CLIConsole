@@ -7,6 +7,10 @@ use Arris\Toolkit\CLI\Option;
 use Arris\Toolkit\CLI\OptionType;
 use Arris\Toolkit\CLI\Parser;
 use Closure;
+use ReflectionException;
+use ReflectionMethod;
+use RuntimeException;
+use Throwable;
 
 /**
  * Оркестратор CLI: регистрация → парсинг → выполнение
@@ -14,17 +18,35 @@ use Closure;
 final class CLIRunner
 {
     private Parser $parser;
+
     /** @var array<string, mixed> */
     private array $optionsValues = [];
+
     /** @var array<string, mixed> */
     private array $variables = [];
+
     private ?string $scriptDescription;
+
     private bool $verbose = false;
+
+    /** @var array<class-string, object> Зарегистрированные инстансы классов */
+    private array $classInstances = [];
 
     public function __construct(?string $scriptDescription = null)
     {
         $this->parser = new Parser();
         $this->scriptDescription = $scriptDescription;
+    }
+
+    public function registerClass(string $className, object $instance): self
+    {
+        if (!($instance instanceof $className)) {
+            throw new RuntimeException(
+                "Instance must be of class {$className} or its descendant"
+            );
+        }
+        $this->classInstances[$className] = $instance;
+        return $this;
     }
 
     public function register(
@@ -108,9 +130,72 @@ final class CLIRunner
         foreach ($this->parser->getOptions() as $option) {
             if ($this->has($option->name) && $option->handler !== null) {
                 $value = $this->get($option->name);
-                ($option->handler)($value, $this);
+                $handler = $this->resolveHandler($option->handler);
+                $handler($value, $this);
             }
         }
+    }
+
+    /**
+     * @param Closure|array $handler
+     * @return Closure
+     */
+    private function resolveHandler(Closure|array $handler): Closure
+    {
+        if ($handler instanceof Closure) {
+            return $handler;
+        }
+
+        if (!is_array($handler) || count($handler) !== 2) {
+            throw new RuntimeException('Handler must be a Closure or [class/object, method]');
+        }
+
+        [$classOrObject, $method] = $handler;
+
+        // Объект передан напрямую — используем как есть
+        if (is_object($classOrObject)) {
+            return fn(...$args) => $classOrObject->$method(...$args);
+        }
+
+        // Строка (имя класса) — резолвим инстанс
+        if (is_string($classOrObject)) {
+            try {
+                $reflection = new ReflectionMethod($classOrObject, $method);
+            } catch (ReflectionException $e) {
+                throw new RuntimeException(
+                    "Method {$classOrObject}::{$method}() does not exist",
+                    0,
+                    $e
+                );
+            }
+
+            // Статический метод — вызываем напрямую
+            if ($reflection->isStatic()) {
+                return fn(...$args) => $classOrObject::$method(...$args);
+            }
+
+            // Нестатический метод: сначала ищем зарегистрированный инстанс
+            $instance = $this->classInstances[$classOrObject] ?? null;
+
+            if ($instance === null) {
+                // Инстанс не зарегистрирован — создаём через new
+                try {
+                    $instance = new $classOrObject();
+                } catch (Throwable $e) {
+                    throw new RuntimeException(
+                        "Cannot instantiate {$classOrObject} for handler. " .
+                        "Use \$cli->registerClass({$classOrObject}::class, new {$classOrObject}(...)) " .
+                        "to provide a pre-configured instance.",
+                        0,
+                        $e
+                    );
+                }
+            }
+
+            return fn(...$args) => $instance->$method(...$args);
+        }
+
+        throw new RuntimeException('Invalid handler format');
     }
 
     private function showHelp(): void

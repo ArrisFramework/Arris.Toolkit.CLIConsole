@@ -4,63 +4,74 @@ namespace Arris\Toolkit;
 
 class CLIPrompt implements CLIPromptInterface
 {
+    /**
+     * Кэш для обнаруженного shell
+     */
+    private static ?string $cachedShell = null;
+
     public static function readline(
         string $prompt,
-        string $allowed_pattern = '/.*/',
-        bool $strict_mode = false
+        string $allowedPattern = '/.*/',
+        bool $strictMode = false,
     ): bool|string
     {
-        if ($strict_mode) {
-            if ((!str_starts_with($allowed_pattern, '/')) || (!str_ends_with($allowed_pattern, '/'))) {
-                return false;
-            }
-        } else {
-            if (!str_starts_with($allowed_pattern, '/'))
-                $allowed_pattern = '/' . $allowed_pattern;
-            if (!str_ends_with($allowed_pattern, '/'))
-                $allowed_pattern .= '/';
+        $pattern = self::normalizePattern($allowedPattern, $strictMode);
+
+        if ($pattern === false) {
+            return false;
         }
 
         do {
-            $result = \readline($prompt);
-
-        } while (\preg_match($allowed_pattern, $result) !== 1);
+            $result = readline($prompt);
+            if ($result === false) {
+                return false; // EOF или ошибка
+            }
+        } while (preg_match($pattern, $result) !== 1);
 
         return $result;
     }
 
-    public static function prompt(): string
+    public static function prompt(string $message = ''): string
     {
+        if ($message !== '') {
+            echo $message;
+        }
+
         $stdin = fopen('php://stdin', 'r');
         if (false === $stdin) {
             throw new \RuntimeException('Failed to open STDIN, could not prompt user for input.');
         }
-        $answer = self::trimAnswer(fgets($stdin, 4096));
+        $answer = fgets($stdin, 4096);
         fclose($stdin);
 
-        return $answer;
+        return self::trimAnswer($answer ?: '');
     }
 
-    public static function hiddenPrompt(bool $allowFallback = false): string
+    public static function hiddenPrompt(string $message = 'Password: ', bool $allowFallback = false): string
     {
         if (file_exists('/usr/bin/env')) {
-            // handle other OSs with bash/zsh/ksh/csh if available to hide the answer
-            $test = "/usr/bin/env %s -c 'echo OK' 2> /dev/null";
-            foreach (array('bash', 'zsh', 'ksh', 'csh', 'sh') as $sh) {
-                $output = shell_exec(sprintf($test, $sh));
-                if (is_string($output) && 'OK' === rtrim($output)) {
-                    $shell = $sh;
-                    break;
-                }
-            }
+            $shell = self::detectShell();
 
-            if (isset($shell)) {
-                $readCmd = ($shell === 'csh') ? 'set mypassword = $<' : 'read -r mypassword';
-                $command = sprintf("/usr/bin/env %s -c 'stty -echo; %s; stty echo; echo \$mypassword'", $shell, $readCmd);
+            if ($shell !== null) {
+                $readCmd = match($shell) {
+                    'csh' => 'set mypassword = $<',
+                    default => 'read -r mypassword',
+                };
+
+                $command = sprintf(
+                    "/usr/bin/env %s -c 'stty -echo; %s; stty echo; echo \$mypassword'",
+                    $shell,
+                    $readCmd
+                );
+
+                if ($message !== '') {
+                    echo $message;
+                }
+
                 $output = shell_exec($command);
 
                 if ($output !== null) {
-                    echo PHP_EOL; // output a newline to be on par with the regular prompt()
+                    echo PHP_EOL;
                     return self::trimAnswer($output);
                 }
             }
@@ -81,5 +92,53 @@ class CLIPrompt implements CLIPromptInterface
     private static function trimAnswer($str): string
     {
         return preg_replace('{\r?\n$}D', '', (string) $str) ?: '';
+    }
+
+    /**
+     * Нормализация и валидация regex-паттерна
+     */
+    private static function normalizePattern(string $pattern, bool $strictMode): string|false
+    {
+        if ($strictMode) {
+            if (!str_starts_with($pattern, '/') || !str_ends_with($pattern, '/')) {
+                return false;
+            }
+        } else {
+            // Non-strict mode: добавляем / если нужно
+            if (!str_starts_with($pattern, '/')) {
+                $pattern = '/' . $pattern;
+            }
+            if (!str_ends_with($pattern, '/')) {
+                $pattern .= '/';
+            }
+        }
+
+        // Проверка валидности regex
+        if (@preg_match($pattern, '') === false) {
+            return false;
+        }
+
+        return $pattern;
+    }
+
+    /**
+     * Обнаружение доступного shell (с кэшированием)
+     */
+    private static function detectShell(): ?string
+    {
+        if (self::$cachedShell !== null) {
+            return self::$cachedShell;
+        }
+
+        $test = "/usr/bin/env %s -c 'echo OK' 2> /dev/null";
+        foreach (['bash', 'zsh', 'ksh', 'csh', 'sh'] as $sh) {
+            $output = shell_exec(sprintf($test, $sh));
+            if (is_string($output) && 'OK' === rtrim($output)) {
+                self::$cachedShell = $sh;
+                return $sh;
+            }
+        }
+
+        return null;
     }
 }

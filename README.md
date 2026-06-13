@@ -12,6 +12,7 @@ CLI Console class
 - 2023/08/07 - new colors
 - 2024/07/22 - hr with custom width 
 - 2024/12/11 - new CLIPrompt class, some fixes in call methods
+- 2026/06/14 - added CLIRunner class
 
 # CLIConsole::say
 
