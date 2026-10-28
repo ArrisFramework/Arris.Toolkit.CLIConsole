@@ -64,11 +64,17 @@ class CLIConsole implements CLIConsoleInterface
         // replace <hr>
         $pattern_hr = self::PATTERN_HR;
         $message = \preg_replace_callback($pattern_hr, function ($matches) {
-            $color = $matches['attrName1'] == 'color' ? $matches['attrValue1'] : ($matches['attrName2'] == 'color' ? $matches['attrValue2'] : "white");
-            $width = $matches['attrName1'] == 'width' ? $matches['attrValue1'] : ($matches['attrName2'] == 'width' ? $matches['attrValue2'] : 80);
+            $attrName1  = $matches['attrName1'] ?? null;
+            $attrName2  = $matches['attrName2'] ?? null;
+            $attrValue1 = $matches['attrValue1'] ?? null;
+            $attrValue2 = $matches['attrValue2'] ?? null;
+
+            $color = $attrName1 === 'color' ? $attrValue1 : ($attrName2 === 'color' ? $attrValue2 : 'white');
+            $width = $attrName1 === 'width' ? $attrValue1 : ($attrName2 === 'width' ? $attrValue2 : 80);
             $width = \max((int)$width, 0);
             $line = \str_repeat('-', $width);
             $color = self::FOREGROUND_COLORS[$color] ?? self::FOREGROUND_COLORS['white'];
+
             return
                 (self::$options['newline_before_hr'] ? PHP_EOL : '') .
                 "\033[{$color}m{$line}\033[0m" .
