@@ -11,7 +11,7 @@ final class MissingRequiredOptionException extends RuntimeException
         public readonly ?string $shortName,
     ) {
         parent::__construct(
-            "Missing required option: --{$optionName}" .
+            "Missing required value for option --{$optionName}" .
             ($shortName !== null ? " (-{$shortName})" : '')
         );
     }

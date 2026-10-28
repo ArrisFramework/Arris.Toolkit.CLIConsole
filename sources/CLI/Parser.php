@@ -42,7 +42,10 @@ final class Parser
             $long[] = $option->getLongPattern();
         }
 
-        $parsed = getopt($short, $long);
+        // Always scan argv for missing values of WithValue options
+        $this->detectMissingValueOnGetoptFailure($argv);
+
+        $parsed = @getopt($short, $long);
 
         if ($parsed === false) {
             throw new RuntimeException('Failed to parse CLI options');
@@ -54,9 +57,69 @@ final class Parser
         $values = [];
         foreach ($this->options as $name => $option) {
             if (array_key_exists($name, $parsed)) {
-                $values[$name] = $option->isFlag() ? true : $parsed[$name];
+                if ($option->isFlag()) {
+                    $values[$name] = true;
+                } else {
+                    $rawValue = $parsed[$name];
+                    // getopt may return false if value is missing
+                    if ($rawValue === false) {
+                        if ($option->default !== null) {
+                            $values[$name] = $option->default;
+                            continue;
+                        }
+                        $shortLabel = $option->short ? " (-{$option->short})" : '';
+                        throw new MissingRequiredOptionException(
+                            $option->name,
+                            $option->short,
+                            "value for option --{$option->name}{$shortLabel} REQUIRED, default value is not set"
+                        );
+                    }
+                    // Empty string passed as --option= (value given but empty)
+                    if ($rawValue === '') {
+                        if ($option->default !== null) {
+                            $values[$name] = $option->default;
+                            continue;
+                        }
+                        $shortLabel = $option->short ? " (-{$option->short})" : '';
+                        throw new MissingRequiredOptionException(
+                            $option->name,
+                            $option->short,
+                            "value for option --{$option->name}{$shortLabel} REQUIRED, default value is not set"
+                        );
+                    }
+                    $values[$name] = $rawValue;
+                }
             } elseif ($option->short !== null && array_key_exists($option->short, $parsed)) {
-                $values[$name] = $option->isFlag() ? true : $parsed[$option->short];
+                if ($option->isFlag()) {
+                    $values[$name] = true;
+                } else {
+                    $rawValue = $parsed[$option->short];
+                    if ($rawValue === false) {
+                        if ($option->default !== null) {
+                            $values[$name] = $option->default;
+                            continue;
+                        }
+                        $shortLabel = $option->short ? " (-{$option->short})" : '';
+                        throw new MissingRequiredOptionException(
+                            $option->name,
+                            $option->short,
+                            "value for option --{$option->name}{$shortLabel} REQUIRED, default value is not set"
+                        );
+                    }
+                    if ($rawValue === '') {
+                        if ($option->default !== null) {
+                            $values[$name] = $option->default;
+                            continue;
+                        }
+                        $shortLabel = $option->short ? " (-{$option->short})" : '';
+                        throw new MissingRequiredOptionException(
+                            $option->name,
+                            $option->short,
+                            "value for option --{$option->name}{$shortLabel} REQUIRED, default value is not set"
+                        );
+                    }
+                    $values[$name] = $rawValue;
+                }
             } elseif ($option->default !== null) {
                 $values[$name] = $option->default;
             }
@@ -64,13 +127,12 @@ final class Parser
 
         if (!$help) {
             foreach ($this->options as $option) {
-                if (!$option->required) {
-                    continue;
-                }
-
-                if (!array_key_exists($option->name, $values)) {
+                if ($option->required && !array_key_exists($option->name, $values)) {
                     throw new MissingRequiredOptionException($option->name, $option->short);
                 }
+
+                // If option of type WithValue was explicitly passed but we somehow missed it
+                // and have no default - should be caught above, but be defensive
             }
         }
 
@@ -79,6 +141,56 @@ final class Parser
             'help' => $help,
             'verbose' => $verbose,
         ];
+    }
+
+    private function detectMissingValueOnGetoptFailure(array $argv): void
+    {
+        if (count($argv) === 0) {
+            return;
+        }
+
+        foreach ($this->options as $option) {
+            if ($option->isFlag()) {
+                continue;
+            }
+
+            $longName = '--' . $option->name;
+            $shortName = $option->short !== null ? '-' . $option->short : null;
+
+            foreach ($argv as $arg) {
+                if (!is_string($arg)) {
+                    continue;
+                }
+                if ($arg === $longName || ($shortName !== null && $arg === $shortName)) {
+                    if ($option->default !== null) {
+                        continue;
+                    }
+                    $shortLabel = $option->short ? " (-{$option->short})" : '';
+                    throw new MissingRequiredOptionException(
+                        $option->name,
+                        $option->short,
+                        "value for option --{$option->name}{$shortLabel} REQUIRED, default value is not set"
+                    );
+                }
+                if (str_starts_with($arg, $longName . '=')) {
+                    $value = substr($arg, strlen($longName) + 1);
+                    if ($value === '' && $option->default !== null) {
+                        continue;
+                    }
+                    if ($value === '' && $option->default === null) {
+                        $shortLabel = $option->short ? " (-{$option->short})" : '';
+                        throw new MissingRequiredOptionException(
+                            $option->name,
+                            $option->short,
+                            "value for option --{$option->name}{$shortLabel} REQUIRED, default value is not set"
+                        );
+                    }
+                }
+                if ($shortName !== null && str_starts_with($arg, $shortName) && strlen($arg) > strlen($shortName) && $arg[strlen($shortName)] !== '-') {
+                    // -dvalue form - might be ok, but let getopt handle normally
+                }
+            }
+        }
     }
 
     /** @return array<string, Option> */
