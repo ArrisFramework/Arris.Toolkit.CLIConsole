@@ -6,6 +6,7 @@ use Arris\Toolkit\CLI\Exceptions\MissingRequiredOptionException;
 use Arris\Toolkit\CLI\Option;
 use Arris\Toolkit\CLI\OptionType;
 use Arris\Toolkit\CLI\Parser;
+use Arris\Toolkit\CLI\ParserNative;
 use Closure;
 use ReflectionException;
 use ReflectionMethod;
@@ -17,7 +18,7 @@ use Throwable;
  */
 final class CLIRunner
 {
-    private Parser $parser;
+    private Parser|ParserNative $parser;
 
     /** @var array<string, mixed> */
     private array $optionsValues = [];
@@ -35,9 +36,9 @@ final class CLIRunner
     /** @var array<string, string|null> Порядок групп для help: ключ - имя группы, значение - описание группы или null */
     private array $helpGroupOrder = [];
 
-    public function __construct(?string $scriptDescription = null)
+    public function __construct(?string $scriptDescription = null, bool $useLegacyParser = false)
     {
-        $this->parser = new Parser();
+        $this->parser = $useLegacyParser ? new ParserNative() : new Parser();
         $this->scriptDescription = $scriptDescription;
     }
 

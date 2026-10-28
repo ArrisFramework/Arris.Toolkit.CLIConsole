@@ -8,9 +8,19 @@
 - 📖 **Автоматический help** — справка генерируется из зарегистрированных опций с выравниванием
 - ✅ **Валидация обязательных опций** — понятные ошибки при отсутствии required-опций
 - 🔧 **Три типа опций**: флаги (`--verbose`), обязательное значение (`--config=file`), опциональное значение (`--log[=level]`)
-- 📦 **Dependency injection** — `registerClass()` для передачи готовых инстансов в обработчики
+- 📦 **Dependency injection** — `registerClass()` для передачи готовых инстансов в обработчиках
 - 🎨 **Встроенный `--verbose` режим** — условный вывод через `$runner->say()`
 - 🛡 **PHP 8.2 ready** — enums, readonly-классы, union-типы
+- ⚙️ **Два парсера** — новый токен-парсер по умолчанию, legacy `getopt()` через `new CLIRunner(..., true)` или `ParserNative`
+
+## Конструктор
+
+```php
+$cli = new CLIRunner(?string $scriptDescription = null, bool $useLegacyParser = false);
+```
+
+- `$scriptDescription` — описание скрипта для вывода в `--help`
+- `$useLegacyParser` — при `true` используется `ParserNative` на основе `getopt()`. По умолчанию `false` (новый токен-парсер).
 
 ## Быстрый старт
 
@@ -86,37 +96,49 @@ $cli->register(
 
 ### 2. Обязательное значение (`WithValue`)
 
-Если опция передана, у неё **должно быть** значение (`--config=file`).
+Опция типа `WithValue` требует **значение**, если сама опция передана. 
+
+**Формы передачи (новый парсер):**
+- `--config=file` — через `=` (единственный поддерживаемый способ для длинного ключа)
+- `-c file` — короткий ключ через пробел
+- Пустое значение можно передать как `-c ""` (отдельный токен в кавычках). `--config=` (пустое после `=` без кавычек) трактуется как **отсутствие значения** и вызывает ошибку, если нет `default`
+
+**Взаимосвязь `required` и `default`:**
+- `required` в `register()` означает **обязательность самой опции** — опция должна быть передана в CLI. По умолчанию `false`.
+- `default` — значение, которое подставляется, если опция **вообще не передана**.
+- **Автоматического выставления `required=true` при `WithValue` без `default` больше нет.** Раньше это поведение существовало, сейчас убрано намеренно. Обязательность самой опции задаётся только явным `required: true`.
+- Если опция типа `WithValue` передана, но значение не предоставлено и `default === null` — парсер бросает `MissingRequiredOptionException` с сообщением `value for option --{name} (-{short}) REQUIRED, default value is not set` и скрипт завершается с кодом `2`.
+- Если опция типа `WithValue` **не передана вообще** и нет `default` и `required === false` — опция просто отсутствует в `$values`, обработчик не вызывается.
 
 ```php
+// Опция не обязательна. Если передана - значение ОБЯЗАТЕЛЬНО. Если не передана - игнорируем.
+$cli->register(
+    option: 'delete',
+    short: 'd',
+    type: CLIOptionType::WithValue,
+    description: 'Удалить пакет из кэша: --delete=vendor/package-name',
+    handler: function ($value, $cli) {
+        var_dump($value);
+    },
+);
+
+// То же самое, но если не передана - подставляется default
 $cli->register(
     option: 'config',
     short: 'c',
     type: CLIOptionType::WithValue,
-    description: 'Path to config file',
-);
-```
-
-⚠️ **Автоматическая обязательность**: если у опции типа `WithValue` нет `default`, она автоматически становится `required`. 
-Чтобы сделать её опциональной — укажите `default`:
-
-⚠️ Не знаю, чем я думал, когда делал такой механизм. Ведь обязательность значения НЕ РАВНО обязательности опции. 
-Вроде бы (!) из кода это удалено, в ридми осталось...
-
-⚠️ ДА, В КОДЕ СЛОМАНО. СМ `TODO.md` 
-
-```php
-// required автоматически = true (нет default)
-$cli->register(
-    option: 'config',
-    type: CLIOptionType::WithValue,
-);
-
-// required автоматически = false (есть default)
-$cli->register(
-    option: 'config',
-    type: CLIOptionType::WithValue,
     default: 'config.json',
+    handler: function ($path, $cli) {
+        // ...
+    },
+);
+
+// Сама опция обязательна к передаче
+$cli->register(
+    option: 'database',
+    type: CLIOptionType::WithValue,
+    required: true,
+    description: 'Database DSN',
 );
 ```
 
@@ -137,16 +159,18 @@ $cli->register(
 
 ## Обязательные опции
 
+Параметр `$required` у `register()` отвечает **только** за то, что сама опция должна быть передана. Он **не** связан с тем, нужно ли значение для `WithValue`.
+
 ```php
 $cli->register(
     option: 'database',
     type: CLIOptionType::WithValue,
-    required: true,  // явно обязательно
+    required: true,  // сама опция обязательна к передаче
     description: 'Database DSN',
 );
 ```
 
-При отсутствии обязательной опции скрипт завершается с кодом `2`:
+При отсутствии обязательной опции (когда `required: true` и опция не передана) скрипт завершается с кодом `2`:
 
 ```bash
 $ php script.php
@@ -368,7 +392,7 @@ $cli->run();
 
 | Метод                                                                                                                                                                                                                     | Описание |
 |---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---|
-| `__construct(?string $scriptDescription = null)`                                                                                                                                                                          | Создание runner'а с опциональным описанием скрипта |
+| `__construct(?string $scriptDescription = null, bool $useLegacyParser = false)`                                                                                                                                          | Создание runner'а с опциональным описанием скрипта. При `$useLegacyParser = true` используется `ParserNative` на основе `getopt()` |
 | `register(string $option, ?string $short = null, string $description = '', CLIOptionType $type = Flag, mixed $default = null, ?bool $required = null, Closure\|array\|null $handler = null, ?string $group = null): self` | Регистрация опции |
 | `registerClass(string $className, object $instance): self`                                                                                                                                                                | Регистрация готового инстанса класса |
 | `run(): bool`                                                                                                                                                                                                             | Запуск обработки CLI. Возвращает `false` если был показан help |
@@ -389,21 +413,27 @@ TODO:
 | `WithValue` | Опция с обязательным значением (`--key=value`) |
 | `WithOptionalValue` | Опция с опциональным значением (`--key[=value]`) |
 
-### `CLIParser`
+### `CLIParser` / `Parser` / `ParserNative`
 
 Парсер опций. Обычно используется через `CLIRunner`, но может быть использован отдельно:
 
 ```php
-$parser = new CLIParser();
-$parser->add(new CLIOption('config', 'c', 'Config file', CLIOptionType::WithValue, null, true, null));
+$parser = new Arris\Toolkit\CLI\Parser(); // новый токен-парсер (по умолчанию)
+$parser->add(new Arris\Toolkit\CLI\Option('config', 'c', 'Config file', Arris\Toolkit\CLI\OptionType::WithValue, null, false, null));
 
 $result = $parser->parse($argv);
 // ['values' => [...], 'help' => bool, 'verbose' => bool]
 ```
 
+`ParserNative` — legacy парсер на основе `getopt()`. Доступен через `new CLIRunner($desc, true)`.
+
 ### `CLIMissingRequiredOptionException`
 
-Выбрасывается при отсутствии обязательной опции. Содержит:
+Выбрасывается при валидации:
+- при отсутствии опции с `required: true`
+- при передаче `WithValue` без значения и без `default` (сообщение вида `value for option --{name} (-{short}) REQUIRED, default value is not set`)
+
+Содержит:
 - `optionName` — имя опции
 - `shortName` — короткое имя (если есть)
 
@@ -411,11 +441,27 @@ $result = $parser->parse($argv);
 
 ### Отсутствие обязательной опции
 
+Когда опция помечена как `required: true`, но не передана:
+
 ```bash
 Error: Missing required option: --config (-c)
 Use --help for available options
 ```
 Exit code: `2`
+
+### Отсутствие значения для `WithValue`
+
+Когда опция типа `WithValue` передана, но значение не предоставлено и нет `default`:
+
+```bash
+$ php script.php --delete
+Error: value for option --delete (-d) REQUIRED, default value is not set
+Use --help for available options
+```
+
+Аналогично для `--delete=` (пустое значение после `=` без кавычек), `-d` без следующего валидного значения.
+
+Пустое значение можно передать явно: `-d ""` или в кавычках. `--delete=""` в зависимости от того, как передаст shell — в новом парсере `--delete=` трактуется как отсутствие значения, пустая строка как отдельный токен принимается.
 
 ### Невозможно инстанциировать класс
 
@@ -430,11 +476,14 @@ Use $cli->registerClass(MyService::class, new MyService(...)) to provide a pre-c
 Method MyService::unknownMethod() does not exist
 ```
 
-### Попытка зарегистрировать опцию с зарезервированным именем
+### Попытка зарегистрировать опцию с зарезервированным именем (legacy/parser behavior)
 
+В `ParserNative` (getopt) при регистрации опции с именем `verbose` или коротким `v` бросается исключение:
 ```
 Option name 'verbose' or short 'v' is reserved for built-in verbose mode
 ```
+
+В новом токен-парсере `Parser` это ограничение снято — можно переопределить `--help/-h`, `--verbose/-v`, но делать этого **не рекомендуется**.
 
 ## Требования
 
