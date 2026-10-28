@@ -25,6 +25,7 @@ $cli->register(
     short: 'r',
     description: 'Clear Redis keys for site',
     handler: fn($value, $runner) => CLIConsole::say("<font color='green'>Redis cleared</font>"),
+    group: 'Redis'
 );
 
 $cli->register(
@@ -41,7 +42,7 @@ $cli->register(
 $cli->run();
 
 // Использование значений после парсинга
-if ($configPath = $runner->getVar('config_path')) {
+if ($configPath = $cli->getVar('config_path')) {
     CLIConsole::say("Loaded config: {$configPath}");
 }
 ```
@@ -96,7 +97,13 @@ $cli->register(
 );
 ```
 
-⚠️ **Автоматическая обязательность**: если у опции типа `WithValue` нет `default`, она автоматически становится `required`. Чтобы сделать её опциональной — укажите `default`:
+⚠️ **Автоматическая обязательность**: если у опции типа `WithValue` нет `default`, она автоматически становится `required`. 
+Чтобы сделать её опциональной — укажите `default`:
+
+⚠️ Не знаю, чем я думал, когда делал такой механизм. Ведь обязательность значения НЕ РАВНО обязательности опции. 
+Вроде бы (!) из кода это удалено, в ридми осталось...
+
+⚠️ ДА, В КОДЕ СЛОМАНО. СМ `TODO.md` 
 
 ```php
 // required автоматически = true (нет default)
@@ -359,18 +366,20 @@ $cli->run();
 
 ### `CLIRunner`
 
-| Метод | Описание |
-|---|---|
-| `__construct(?string $scriptDescription = null)` | Создание runner'а с опциональным описанием скрипта |
-| `register(string $option, ?string $short = null, string $description = '', CLIOptionType $type = Flag, mixed $default = null, ?bool $required = null, Closure\|array\|null $handler = null): self` | Регистрация опции |
-| `registerClass(string $className, object $instance): self` | Регистрация готового инстанса класса |
-| `run(): bool` | Запуск обработки CLI. Возвращает `false` если был показан help |
-| `has(string $option): bool` | Была ли передана опция |
-| `get(string $option): mixed` | Значение опции |
-| `set(string $key, mixed $value): void` | Установить переменную приложения |
-| `getVar(string $key): mixed` | Получить переменную приложения |
-| `isVerbose(): bool` | Включен ли verbose-режим |
-| `say(string $message, bool $always = false): void` | Вывести сообщение. С `always: true` — всегда, иначе только с `--verbose` |
+| Метод                                                                                                                                                                                                                     | Описание |
+|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---|
+| `__construct(?string $scriptDescription = null)`                                                                                                                                                                          | Создание runner'а с опциональным описанием скрипта |
+| `register(string $option, ?string $short = null, string $description = '', CLIOptionType $type = Flag, mixed $default = null, ?bool $required = null, Closure\|array\|null $handler = null, ?string $group = null): self` | Регистрация опции |
+| `registerClass(string $className, object $instance): self`                                                                                                                                                                | Регистрация готового инстанса класса |
+| `run(): bool`                                                                                                                                                                                                             | Запуск обработки CLI. Возвращает `false` если был показан help |
+| `has(string $option): bool`                                                                                                                                                                                               | Была ли передана опция |
+| `get(string $option): mixed`                                                                                                                                                                                              | Значение опции |
+| `set(string $key, mixed $value): void`                                                                                                                                                                                    | Установить переменную приложения |
+| `getVar(string $key): mixed`                                                                                                                                                                                              | Получить переменную приложения |
+| `isVerbose(): bool`                                                                                                                                                                                                       | Включен ли verbose-режим |
+| `say(string $message, bool $always = false): void`                                                                                                                                                                        | Вывести сообщение. С `always: true` — всегда, иначе только с `--verbose` |
+
+TODO: 
 
 ### `CLIOptionType`
 

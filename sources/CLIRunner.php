@@ -32,10 +32,32 @@ final class CLIRunner
     /** @var array<class-string, object> Зарегистрированные инстансы классов */
     private array $classInstances = [];
 
+    /** @var array<string, string|null> Порядок групп для help: ключ - имя группы, значение - описание группы или null */
+    private array $helpGroupOrder = [];
+
     public function __construct(?string $scriptDescription = null)
     {
         $this->parser = new Parser();
         $this->scriptDescription = $scriptDescription;
+    }
+
+    /**
+     * Задать порядок групп для вывода в help.
+     * Формат: ['GroupName' => 'Group description', 'AnotherGroup' => null, 'ThirdGroup']
+     * Если значение - строка, используется как заголовок группы с описанием
+     * Если значение - null или числовой ключ - используется только имя группы
+     */
+    public function setHelpGroupOrder(array $order): self
+    {
+        $this->helpGroupOrder = [];
+        foreach ($order as $key => $value) {
+            if (is_int($key)) {
+                $this->helpGroupOrder[$value] = null;
+            } else {
+                $this->helpGroupOrder[$key] = $value;
+            }
+        }
+        return $this;
     }
 
     public function registerClass(string $className, object $instance): self
@@ -50,16 +72,17 @@ final class CLIRunner
     }
 
     public function register(
-        string             $option,
-        ?string            $short = null,
-        string             $description = '',
-        OptionType         $type = OptionType::Flag,
-        mixed              $default = null,
-        ?bool              $required = null,
-        Closure|array|null $handler = null,
+        string              $option,
+        ?string             $short = null,
+        string              $description = '',
+        OptionType          $type = OptionType::Flag,
+        mixed               $default = null,
+        ?bool               $required = null,
+        Closure|array|null  $handler = null,
+        ?string             $group = null,
     ): self {
         $this->parser->add(
-            new Option($option, $short, $description, $type, $default, $required, $handler)
+            new Option($option, $short, $description, $type, $default, $required, $handler, $group)
         );
         return $this;
     }
@@ -222,42 +245,109 @@ final class CLIRunner
             ],
         ];
 
-        $userOptions = [];
-        foreach ($this->parser->getOptions() as $option) {
-            $shortPart = $option->short ? "-{$option->short}, " : '    ';
-            $valueSuffix = match ($option->type) {
-                OptionType::Flag => '',
-                OptionType::WithValue => '=<value>',
-                OptionType::WithOptionalValue => '[=<value>]',
-            };
-            $requiredMark = $option->required
-                ? " <font color='red'>[required]</font>"
-                : '';
-
-            $label = "{$shortPart}--{$option->name}{$valueSuffix}";
-            $userOptions[] = [
-                'label' => $label,
-                'label_with_tags' => "<font color='yellow'>{$label}</font>",
-                'description' => $option->description,
-                'suffix' => $requiredMark,
-            ];
-        }
-
-        $allOptions = array_merge($builtinOptions, $userOptions);
-
+        // Выводим встроенные опции
         $maxLength = 0;
-        foreach ($allOptions as $opt) {
+        foreach ($builtinOptions as $opt) {
             $maxLength = max($maxLength, strlen($opt['label']));
         }
 
         $padding = $maxLength + 4;
 
-        foreach ($allOptions as $opt) {
+        foreach ($builtinOptions as $opt) {
             $paddingNeeded = $padding - strlen($opt['label']);
             $paddingSpaces = str_repeat(' ', $paddingNeeded);
 
             $this->say(
                 "  {$opt['label_with_tags']}{$paddingSpaces}{$opt['description']}{$opt['suffix']}",
+                true
+            );
+        }
+
+        // Группируем пользовательские опции
+        $groups = [];
+        $ungrouped = [];
+
+        foreach ($this->parser->getOptions() as $option) {
+            $item = [
+                'option' => $option,
+                'label' => $this->formatOptionLabel($option),
+                'label_with_tags' => '',
+                'description' => $option->description,
+                'suffix' => $option->required ? " <font color='red'>[required]</font>" : '',
+            ];
+            $item['label_with_tags'] = "<font color='yellow'>{$item['label']}</font>";
+
+            if ($option->group === null || $option->group === '') {
+                $ungrouped[] = $item;
+            } else {
+                if (!isset($groups[$option->group])) {
+                    $groups[$option->group] = [];
+                }
+                $groups[$option->group][] = $item;
+            }
+        }
+
+        // Выводим группы в заданном порядке
+        if (!empty($this->helpGroupOrder)) {
+            foreach ($this->helpGroupOrder as $groupName => $groupDesc) {
+                if (empty($groups[$groupName])) {
+                    continue;
+                }
+                $this->outputGroup($groupName, $groupDesc, $groups[$groupName]);
+                unset($groups[$groupName]);
+            }
+        }
+
+        // Выводим оставшиеся группы
+        foreach ($groups as $groupName => $items) {
+            $this->outputGroup($groupName, null, $items);
+        }
+
+        // Выводим негруппированные опции
+        if (!empty($ungrouped)) {
+            $this->outputGroup(null, null, $ungrouped);
+        }
+
+        CLIConsole::say();
+    }
+
+    private function formatOptionLabel(\Arris\Toolkit\CLI\Option $option): string
+    {
+        $shortPart = $option->short ? "-{$option->short}, " : '    ';
+        $valueSuffix = match ($option->type) {
+            OptionType::Flag => '',
+            OptionType::WithValue => '=<value>',
+            OptionType::WithOptionalValue => '[=<value>]',
+        };
+        return "{$shortPart}--{$option->name}{$valueSuffix}";
+    }
+
+    private function outputGroup(?string $groupName, ?string $groupDesc, array $items): void
+    {
+        $this->say('', true);
+        if ($groupName === null) {
+            $this->say("<font color='green'>Commands:</font>", true);
+        } else {
+            if ($groupDesc !== null && $groupDesc !== '') {
+                $this->say("<font color='green'>{$groupName}:</font> <font color='gray'>{$groupDesc}</font>", true);
+            } else {
+                $this->say("<font color='green'>{$groupName}:</font>", true);
+            }
+        }
+
+        $maxLength = 0;
+        foreach ($items as $item) {
+            $maxLength = max($maxLength, strlen($item['label']));
+        }
+
+        $padding = $maxLength + 4;
+
+        foreach ($items as $item) {
+            $paddingNeeded = $padding - strlen($item['label']);
+            $paddingSpaces = str_repeat(' ', $paddingNeeded);
+
+            $this->say(
+                "  {$item['label_with_tags']}{$paddingSpaces}{$item['description']}{$item['suffix']}",
                 true
             );
         }

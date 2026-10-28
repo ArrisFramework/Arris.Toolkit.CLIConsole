@@ -8,6 +8,16 @@ final readonly class Option
 {
     public readonly bool $required;
 
+    /**
+     * @param string $name
+     * @param string|null $short
+     * @param string $description
+     * @param OptionType $type
+     * @param mixed $default
+     * @param bool|null $required
+     * @param Closure|array|null $handler
+     * @param string|null $group
+     */
     public function __construct(
         public string             $name,
         public ?string            $short,
@@ -16,9 +26,9 @@ final readonly class Option
         public mixed              $default,
         ?bool                     $required = null,
         public Closure|array|null $handler = null,
+        public ?string            $group = null,
     ) {
-        // Автоматически делаем required, если тип WithValue и нет default
-        $this->required = $required ?? ($this->type === OptionType::WithValue && $this->default === null);
+        $this->required = $required ?? false;
     }
 
     public function isFlag(): bool
